@@ -1,71 +1,39 @@
-def load_data(self, df: pd.DataFrame) -> bool:
-        """
-        [ETAPA 3: CARGA]
-        Insere os dados transformados no sistema de destino.
-        Esta função deve ser chamada pelo Levy, ou pelo processo que ele autorizar.
-        """
-        logging.info(f"Iniciando carga de {len(df)} registros para o sistema: {self.target_system}")
+import pandas as pd
+import logging
 
-        if df.empty:
-            logging.warning("DataFrame vazio, pulando a carga.")
-            return True # Consideramos sucesso se não há nada para carregar
+# Configuração básica de logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-        try:
-            # --- SIMULAÇÃO DA INSERÇÃO REAL ---
-            # Em um cenário real, você teria:
-            # if self.target_system == 'SQL':
-            #    df.to_sql(name='tabela_destino', con=conexao_db, if_exists='append', index=False)
-            # elif self.target_system == 'API':
-            #    for index, row in df.iterrows():
-            #        api_post(row.to_dict())
-
-            # Aqui, apenas simulamos o sucesso da inserção
-            logging.info(f"SUCESSO: Simulação de inserção de {len(df)} registros em {self.target_system}.")
-            # -----------------------------------
-            return True
-        except Exception as e:
-            logging.error(f"ERRO CRÍTICO durante a carga dos dados: {e}")
-            return False
-            
-    def run_pipeline(self) -> bool:
-        """
-        Método que executa a pipeline completa (Extract -> Transform -> Load).
-        """
-        logging.info("--- INÍCIO DA PIPELINE ETL ---")
-        
-        # 1. Extração
-        data_frame = self.extract_data()
-
-        # Verifica se a extração falhou
-        if data_frame.empty and not self.source_path.endswith('.csv'):
-             # Se a extração falhou (por exemplo, arquivo não encontrado) 
-             # e não for só um arquivo vazio, paramos o processo.
-             logging.error("Pipeline abortada devido a falha na extração.")
-             return False
-        
-        # 2. Transformação
-        transformed_df = self.transform_data(data_frame)
-        
-        # 3. Carga
-        success = self.load_data(transformed_df)
-        
-        logging.info(f"--- FIM DA PIPELINE ETL. Status: {'Sucesso' if success else 'Falha'} ---")
-        return success
-
-if __name__ == '__main__':
-    # Este bloco é apenas para testes unitários ou demonstração rápida do módulo
-    logging.info("Executando data_processor.py diretamente. Use main.py para o fluxo completo.")
+def load_data(df: pd.DataFrame, target_system: str) -> bool:
+    """
+    [ETAPA 3: CARGA]
+    Simula a inserção dos dados transformados no sistema de destino.
     
-    # Criando um arquivo CSV de teste para demonstração
-    test_data = {
-        'ID': [1, 2, 3, 4],
-        'Nome Cliente': ['Alice', 'Bob', 'Charlie', 'Diana'],
-        'Valor': [500, 1500, 900, 2000],
-        'Descricao': ['Compra A', None, 'Compra C', 'Compra D']
-    }
-    test_df = pd.DataFrame(test_data)
-    test_df.to_csv('source_data.csv', index=False)
+    >>> ESTA FUNÇÃO É APENAS UMA SIMULAÇÃO. O Levy implementará a lógica de carga SQL.
     
-    # Executando a pipeline de teste
-    processor = ETLProcessor('source_data.csv', 'TEST_DB')
-    processor.run_pipeline()
+    Args:
+        df (pd.DataFrame): DataFrame com os dados transformados.
+        target_system (str): Nome do banco/tabela de destino (PROD_DW_VENDAS).
+
+    Returns:
+        bool: True se a carga for bem-sucedida (ou simulada com sucesso), False em caso de erro.
+    """
+    logging.info(f"Iniciando carga de {len(df)} registros para o sistema: {target_system}")
+
+    if df.empty:
+        logging.warning("DataFrame vazio, pulando a carga.")
+        return True
+
+    # --- PONTO DE INTEGRAÇÃO DO LEVY: SUBSTITUIR PELA CARGA SQL REAL ---
+    try:
+        # Em produção, o Levy usaria uma conexão de banco de dados
+        # para executar INSERT ou MERGE/UPDATE.
+        
+        # Exemplo: engine.execute(sql_query) ou df.to_sql(...)
+        
+        logging.info(f"SUCESSO: Simulação de inserção de {len(df)} registros em {target_system}.")
+        return True
+    except Exception as e:
+        logging.error(f"ERRO CRÍTICO durante a carga dos dados: {e}")
+        return False
+    # -------------------------------------------------------------
