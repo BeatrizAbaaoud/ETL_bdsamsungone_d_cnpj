@@ -1,0 +1,71 @@
+import sys
+import os
+import pandas as pd
+from data_processor import ETLProcessor
+import logging
+
+# Configuração básica de logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def setup_mock_source_file(filepath: str):
+    """
+    Cria um arquivo de dados simulado para garantir que o ETL possa rodar.
+    Em produção, este arquivo seria gerado por um sistema upstream.
+    """
+    logging.info(f"Preparando arquivo de origem simulado em: {filepath}")
+    mock_data = {
+        'ID_Transacao': [101, 102, 103, 104, 105],
+        'Nome do Produto': ['Produto A', 'Produto B', 'Produto C', 'Produto D', 'Produto E'],
+        'Quantidade': [5, 12, 1, 8, 3],
+        'Preco Unitario': [50.5, 10.0, 1500.0, 75.25, 300.0],
+        'Data Venda': ['2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05'],
+        'Status': ['Concluido', 'Pendente', 'Concluido', 'Pendente', None] # Valor nulo
+    }
+    df = pd.DataFrame(mock_data)
+    df.to_csv(filepath, index=False)
+    logging.info("Arquivo de origem simulado criado com sucesso.")
+
+def run_etl_process(source_file: str, target_db: str):
+    """
+    Função principal que inicia e gerencia o processo ETL.
+    """
+    logging.info("==============================================")
+    logging.info("Início do Processo de Inserção de Dados (ETL)")
+    logging.info("==============================================")
+
+    # 1. Instanciar o processador modular
+    processor = ETLProcessor(
+        source_path=source_file, 
+        target_system=target_db
+    )
+
+    # 2. Executar a pipeline completa
+    # Se a pipeline falhar, o método run_pipeline() retorna False
+    if processor.run_pipeline():
+        logging.info("Processo ETL finalizado com SUCESSO. Dados prontos.")
+    else:
+        logging.error("Processo ETL finalizado com FALHA. Verifique os logs acima.")
+
+if __name__ == "__main__":
+    # Definir caminhos e sistemas de destino
+    SOURCE_FILE = 'data_to_process.csv'
+    TARGET_DATABASE = 'PROD_DW_VENDAS' 
+
+    try:
+        # 0. Garante que o arquivo de origem exista (simulação)
+        setup_mock_source_file(SOURCE_FILE)
+
+        # Inicia a execução do ETL
+        run_etl_process(SOURCE_FILE, TARGET_DATABASE)
+        
+        # Limpeza do arquivo simulado (opcional)
+        if os.path.exists(SOURCE_FILE):
+             os.remove(SOURCE_FILE)
+             logging.info(f"Arquivo simulado {SOURCE_FILE} removido após a execução.")
+
+    except ImportError:
+        logging.error("Erro: Não foi possível importar 'data_processor'. Certifique-se de que o arquivo está no mesmo diretório.")
+        sys.exit(1)
+    except Exception as e:
+        logging.critical(f"Erro fatal no script principal: {e}")
+        sys.exit(1)
