@@ -1,29 +1,69 @@
-def transform_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        [ETAPA 2: TRANSFORMAÇÃO]
-        Aplica as regras de negócio e limpeza de dados.
-        Aqui é onde a qualidade dos dados é garantida.
-        """
-        logging.info("Iniciando transformação dos dados.")
+import pandas as pd
+import logging
+from typing import List, Dict, Any
 
-        if df.empty:
-            logging.warning("DataFrame vazio, pulando a transformação.")
-            return df
+# Configuração básica de logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-        # Exemplo de Regra 1: Renomear colunas para o padrão do destino
-        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
-        logging.info("Colunas padronizadas para minúsculas e underscores.")
+def transform_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    [ETAPA 2: TRANSFORMAÇÃO]
+    Aplica as regras de negócio e limpeza de dados (baseadas nas colunas reais da fonte).
+    Aqui é onde a qualidade dos dados é garantida.
+    
+    Args:
+        df (pd.DataFrame): DataFrame com os dados brutos.
 
-        # Exemplo de Regra 2: Tratamento de valores nulos (preenchemos com 'N/A' em strings)
-        df = df.fillna({'coluna_texto': 'N/A', 'coluna_numerica': 0})
-        logging.info("Tratamento básico de valores nulos concluído.")
+    Returns:
+        pd.DataFrame: DataFrame com os dados transformados e padronizados.
+    """
+    logging.info("Iniciando transformação dos dados (aplicação das regras de negócio).")
 
-        # Exemplo de Regra 3: Criação de uma nova feature (Ex: Status de processamento)
-        if 'valor' in df.columns:
-            df['status_valor'] = df['valor'].apply(lambda x: 'ALTO' if x > 1000 else 'BAIXO')
-            logging.info("Nova coluna 'status_valor' criada.")
-        else:
-             logging.warning("Coluna 'valor' não encontrada para criar 'status_valor'.")
-
-        logging.info("Transformação concluída. Dados prontos para carga.")
+    if df.empty:
+        logging.warning("DataFrame vazio, pulando a transformação.")
         return df
+
+    # 1. Mapeamento para garantir consistência (Snake_Case)
+    column_mapping = {
+        'DistributorTier2': 'distributor_tier_2',
+        'PartnerCode': 'partner_code',
+        'EndCustomer_Code': 'end_customer_code',
+        'SalesType': 'sales_type',
+        'SalesDate': 'sales_date',
+        'Invoice_Number': 'invoice_number',
+        'PN': 'part_number', 
+        'QTY': 'quantity',
+        'ProjetoType': 'project_type',
+        'cnpj_revenda': 'cnpj_revenda' 
+    }
+    
+    df = df.rename(columns=column_mapping)
+    logging.info("Colunas renomeadas para o padrão do Data Warehouse (snake_case).")
+    
+    # 2. Regra de Negócio: Tratamento de CNPJ (Limpeza e Padronização)
+    if 'cnpj_revenda' in df.columns:
+        # Remover caracteres não numéricos e garantir que tem 14 dígitos (com preenchimento de zeros à esquerda)
+        df['cnpj_revenda'] = df['cnpj_revenda'].astype(str).str.replace(r'\D+', '', regex=True).str.zfill(14)
+        logging.info("CNPJ limpo e padronizado (14 dígitos, zfill).")
+
+    # 3. Regra de Negócio: Conversão de Tipos e Tratamento de Nulos
+    if 'sales_date' in df.columns:
+        # Converte para data, forçando erro para NaT (Not a Time) em casos inválidos
+        df['sales_date'] = pd.to_datetime(df['sales_date'], errors='coerce')
+        logging.info("SalesDate convertido para datetime.")
+    
+    if 'quantity' in df.columns:
+        # Converte para numérico inteiro, tratando nulos como 0
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce', downcast='integer').fillna(0)
+        logging.info("QTY convertido para numérico e nulos tratados como 0.")
+        
+    # 4. Regra de Negócio: Tratamento de Chaves Nulas
+    # Códigos-chave são preenchidos com 'UNKNOWN' para manter a integridade referencial
+    for col in ['partner_code', 'end_customer_code', 'invoice_number']:
+        if col in df.columns:
+            df[col] = df[col].fillna('UNKNOWN')
+    logging.info("Códigos-chave preenchidos com 'UNKNOWN' onde nulo.")
+
+    logging.info("Transformação concluída. Dados prontos para carga.")
+    return df
+
