@@ -1,0 +1,29 @@
+def transform_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        [ETAPA 2: TRANSFORMAÇÃO]
+        Aplica as regras de negócio e limpeza de dados.
+        Aqui é onde a qualidade dos dados é garantida.
+        """
+        logging.info("Iniciando transformação dos dados.")
+
+        if df.empty:
+            logging.warning("DataFrame vazio, pulando a transformação.")
+            return df
+
+        # Exemplo de Regra 1: Renomear colunas para o padrão do destino
+        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+        logging.info("Colunas padronizadas para minúsculas e underscores.")
+
+        # Exemplo de Regra 2: Tratamento de valores nulos (preenchemos com 'N/A' em strings)
+        df = df.fillna({'coluna_texto': 'N/A', 'coluna_numerica': 0})
+        logging.info("Tratamento básico de valores nulos concluído.")
+
+        # Exemplo de Regra 3: Criação de uma nova feature (Ex: Status de processamento)
+        if 'valor' in df.columns:
+            df['status_valor'] = df['valor'].apply(lambda x: 'ALTO' if x > 1000 else 'BAIXO')
+            logging.info("Nova coluna 'status_valor' criada.")
+        else:
+             logging.warning("Coluna 'valor' não encontrada para criar 'status_valor'.")
+
+        logging.info("Transformação concluída. Dados prontos para carga.")
+        return df
