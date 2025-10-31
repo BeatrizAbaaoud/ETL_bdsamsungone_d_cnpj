@@ -1,54 +1,90 @@
 import sys
 import os
 import pandas as pd
-from data_processor import ETLProcessor
 import logging
+from extract import extract_data
+from transform import transform_data
+from load import load_data
 
 # Configuração básica de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def setup_mock_source_file(filepath: str):
     """
-    Cria um arquivo de dados simulado para garantir que o ETL possa rodar.
-    Em produção, este arquivo seria gerado por um sistema upstream.
+    Cria um arquivo de dados simulado com as colunas reais da fonte (BD Samsung One).
+    Isto garante que a pipeline possa ser testada sem acesso ao banco de dados real.
+    
+    COLUNAS SIMULADAS: DistributorTier2, PartnerCode, EndCustomer_Code, SalesType, SalesDate, 
+    Invoice_Number, PN, QTY, ProjetoType, cnpj_revenda.
     """
-    logging.info(f"Preparando arquivo de origem simulado em: {filepath}")
+    logging.info(f"Preparando arquivo de origem simulado com colunas reais: {filepath}")
+    
+    # Gerando dados que simulam o esquema real:
     mock_data = {
-        'ID_Transacao': [101, 102, 103, 104, 105],
-        'Nome do Produto': ['Produto A', 'Produto B', 'Produto C', 'Produto D', 'Produto E'],
-        'Quantidade': [5, 12, 1, 8, 3],
-        'Preco Unitario': [50.5, 10.0, 1500.0, 75.25, 300.0],
-        'Data Venda': ['2025-10-01', '2025-10-02', '2025-10-03', '2025-10-04', '2025-10-05'],
-        'Status': ['Concluido', 'Pendente', 'Concluido', 'Pendente', None] # Valor nulo
+        'DistributorTier2': ['DT1', 'DT2', 'DT1', 'DT3', 'DT2'],
+        'PartnerCode': ['P100', 'P200', 'P100', 'P300', None], 
+        'EndCustomer_Code': ['C1', 'C2', None, 'C4', 'C5'], 
+        'SalesType': ['Sellout', 'ASM', 'Sellout', 'Sellout', 'ASM'],
+        'SalesDate': ['2025-01-01', '2025-01-05', '2025-01-10', '2025-01-15', '2025-01-20'],
+        'Invoice_Number': [12345, 12346, 12347, None, 12349], 
+        'PN': ['PN001', 'PN002', 'PN001', 'PN003', 'PN004'],
+        'QTY': [10, 5, None, 20, 15], 
+        'ProjetoType': ['GOV', 'COM', 'GOV', 'EDU', 'COM'],
+        'cnpj_revenda': [
+            '12.345.678/0001-90', 
+            '98765432000100', 
+            '11223344000155', 
+            '50', 
+            '00000000000000'
+        ] 
     }
+    
     df = pd.DataFrame(mock_data)
     df.to_csv(filepath, index=False)
     logging.info("Arquivo de origem simulado criado com sucesso.")
 
 def run_etl_process(source_file: str, target_db: str):
     """
-    Função principal que inicia e gerencia o processo ETL.
+    Função principal que inicia e gerencia o processo ETL modular.
+    Orquestra as chamadas para os módulos: extract, transform e load.
     """
     logging.info("==============================================")
     logging.info("Início do Processo de Inserção de Dados (ETL)")
     logging.info("==============================================")
+    
+    success = False
+    
+    try:
+        # 1. Extração: Chama a função do módulo extract.py
+        data_frame = extract_data(source_file)
 
-    # 1. Instanciar o processador modular
-    processor = ETLProcessor(
-        source_path=source_file, 
-        target_system=target_db
-    )
-
-    # 2. Executar a pipeline completa
-    # Se a pipeline falhar, o método run_pipeline() retorna False
-    if processor.run_pipeline():
-        logging.info("Processo ETL finalizado com SUCESSO. Dados prontos.")
-    else:
-        logging.error("Processo ETL finalizado com FALHA. Verifique os logs acima.")
+        if data_frame.empty:
+            logging.error("Pipeline abortada devido a falha na extração ou fonte vazia.")
+            return False
+        
+        # 2. Transformação: Chama a função do módulo transform.py
+        transformed_df = transform_data(data_frame)
+        
+        # 3. Carga: Chama a função do módulo load.py
+        success = load_data(transformed_df, target_db)
+        
+    except ImportError as ie:
+        logging.critical(f"Erro de importação: {ie}. Certifique-se de que extract.py, transform.py e load.py estão presentes.")
+        success = False
+    except Exception as e:
+        logging.critical(f"Erro fatal na orquestração: {e}")
+        success = False
+        
+    finally:
+        logging.info(f"==============================================")
+        logging.info(f"FIM DA PIPELINE ETL. Status: {'Sucesso' if success else 'Falha'}")
+        logging.info(f"==============================================")
+        
+    return success
 
 if __name__ == "__main__":
-    # Definir caminhos e sistemas de destino
-    SOURCE_FILE = 'data_to_process.csv'
+    # Variáveis de ambiente (o Levy usará para definir o destino)
+    SOURCE_FILE = 'source_data_cnpj.csv' 
     TARGET_DATABASE = 'PROD_DW_VENDAS' 
 
     try:
@@ -61,11 +97,9 @@ if __name__ == "__main__":
         # Limpeza do arquivo simulado (opcional)
         if os.path.exists(SOURCE_FILE):
              os.remove(SOURCE_FILE)
-             logging.info(f"Arquivo simulado {SOURCE_FILE} removido após a execução.")
+             logging.info(f"Arquivo simulado temporário {SOURCE_FILE} removido.")
 
-    except ImportError:
-        logging.error("Erro: Não foi possível importar 'data_processor'. Certifique-se de que o arquivo está no mesmo diretório.")
-        sys.exit(1)
     except Exception as e:
         logging.critical(f"Erro fatal no script principal: {e}")
         sys.exit(1)
+
