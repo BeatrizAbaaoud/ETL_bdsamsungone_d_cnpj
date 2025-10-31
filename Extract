@@ -1,0 +1,36 @@
+import pandas as pd
+from typing import List, Dict, Any
+import logging
+
+# Configuração básica de logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class ETLProcessor:
+    """
+    Classe responsável por encapsular as etapas de Extração, Transformação e Carga (ETL).
+    A modularidade é a chave para o sucesso e a manutenibilidade do código.
+    """
+    def __init__(self, source_path: str, target_system: str):
+        self.source_path = source_path
+        self.target_system = target_system
+        logging.info(f"ETLProcessor inicializado. Origem: {source_path}, Destino: {target_system}")
+
+    def extract_data(self) -> pd.DataFrame:
+        """
+        [ETAPA 1: EXTRAÇÃO]
+        Responsável por ler os dados da fonte.
+        Neste exemplo, simulamos a leitura de um arquivo CSV.
+        """
+        logging.info(f"Iniciando extração de dados de: {self.source_path}")
+        try:
+            # Assumindo que a fonte é um CSV. Em um caso real, pode ser um banco de dados, API, etc.
+            df = pd.read_csv(self.source_path)
+            logging.info(f"Extração concluída. {len(df)} registros encontrados.")
+            return df
+        except FileNotFoundError:
+            logging.error(f"ERRO: Arquivo de origem não encontrado em {self.source_path}")
+            # Em produção, você levantaria uma exceção mais específica ou retornaria um DataFrame vazio.
+            return pd.DataFrame()
+        except Exception as e:
+            logging.error(f"Erro inesperado durante a extração: {e}")
+            return pd.DataFrame()
